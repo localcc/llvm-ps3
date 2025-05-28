@@ -1395,6 +1395,10 @@ bool FPPassManager::runOnFunction(Function &F) {
 #ifdef EXPENSIVE_CHECKS
       uint64_t RefHash = FP->structuralHash(F);
 #endif
+
+      /*outs() << "Before " << FP->getPassName() << " pass: ";
+      F.dump();*/
+
       LocalChanged |= FP->runOnFunction(F);
 
 #if defined(EXPENSIVE_CHECKS) && !defined(NDEBUG)

@@ -50,6 +50,7 @@ int llvm::get_physical_cores() { return -1; }
 static int computeHostNumHardwareThreads();
 
 unsigned llvm::ThreadPoolStrategy::compute_thread_count() const {
+  return 1;
   int MaxThreadCount =
       UseHyperThreads ? computeHostNumHardwareThreads() : get_physical_cores();
   if (MaxThreadCount <= 0)

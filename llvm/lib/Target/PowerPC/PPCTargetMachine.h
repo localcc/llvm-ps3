@@ -71,6 +71,10 @@ public:
     const Triple &TT = getTargetTriple();
     return (TT.getArch() == Triple::ppc64 || TT.getArch() == Triple::ppc64le);
   };
+  bool isILP32() const {
+    const Triple &TT = getTargetTriple();
+    return TT.isLV2();
+  }
 
   bool isNoopAddrSpaceCast(unsigned SrcAS, unsigned DestAS) const override {
     // Addrspacecasts are always noops.

@@ -108,6 +108,8 @@ const char *getEdgeKindName(Edge::Kind K) {
     return "Delta16LO";
   case TOC:
     return "TOC";
+  case TOC32:
+    return "TOC32";
   case TOCDelta16:
     return "TOCDelta16";
   case TOCDelta16DS:

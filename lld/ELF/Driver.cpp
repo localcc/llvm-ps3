@@ -1402,7 +1402,8 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
   ctx.arg.outputFile = args.getLastArgValue(OPT_o);
   if (auto *arg = args.getLastArg(OPT_package_metadata))
     parsePackageMetadata(ctx, *arg);
-  ctx.arg.pie = args.hasFlag(OPT_pie, OPT_no_pie, false);
+  ctx.arg.prx = args.hasFlag(OPT_prx, OPT_no_prx, false);
+  ctx.arg.pie = args.hasFlag(OPT_pie, OPT_no_pie, false) || ctx.arg.prx;
   ctx.arg.printIcfSections =
       args.hasFlag(OPT_print_icf_sections, OPT_no_print_icf_sections, false);
   ctx.arg.printGcSections =
@@ -1898,7 +1899,9 @@ static void setConfigs(Ctx &ctx, opt::InputArgList &args) {
   // Set default entry point and output file if not specified by command line or
   // linker scripts.
   ctx.arg.warnMissingEntry =
-      (!ctx.arg.entry.empty() || (!ctx.arg.shared && !ctx.arg.relocatable));
+      (!ctx.arg.entry.empty() ||
+       (!ctx.arg.shared &&
+        !ctx.arg.relocatable)); // todo(localcc): maybe add prx here?
   if (ctx.arg.entry.empty() && !ctx.arg.relocatable)
     ctx.arg.entry = ctx.arg.emachine == EM_MIPS ? "__start" : "_start";
   if (ctx.arg.outputFile.empty())

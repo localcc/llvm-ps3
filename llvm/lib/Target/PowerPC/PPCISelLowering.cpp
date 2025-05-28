@@ -3321,7 +3321,7 @@ static void setUsesTOCBasePtr(SelectionDAG &DAG) {
 
 SDValue PPCTargetLowering::getTOCEntry(SelectionDAG &DAG, const SDLoc &dl,
                                        SDValue GA) const {
-  EVT VT = Subtarget.getScalarIntVT();
+  EVT VT = Subtarget.getPtrVT();
   SDValue Reg = Subtarget.isPPC64() ? DAG.getRegister(PPC::X2, VT)
                 : Subtarget.isAIXABI()
                     ? DAG.getRegister(PPC::R2, VT)
@@ -5795,26 +5795,39 @@ static void prepareDescriptorIndirectCall(SelectionDAG &DAG, SDValue &Callee,
   const unsigned EnvPtrOffset = Subtarget.descriptorEnvironmentPointerOffset();
 
   const MVT RegVT = Subtarget.getScalarIntVT();
+  const MVT PtrVT = Subtarget.getPtrVT();
   const Align Alignment = Subtarget.isPPC64() ? Align(8) : Align(4);
+
+  SDValue newCallee = Callee;
+  if (PtrVT != RegVT) {
+    newCallee = DAG.getZExtOrTrunc(newCallee, dl, RegVT);
+  }
 
   // One load for the functions entry point address.
   SDValue LoadFuncPtr =
-      DAG.getLoad(RegVT, dl, LDChain, Callee, MPI, Alignment, MMOFlags);
+      DAG.getExtLoad(ISD::ZEXTLOAD, dl, RegVT, LDChain, newCallee, MPI, PtrVT,
+                     Alignment, MMOFlags);
 
   // One for loading the TOC anchor for the module that contains the called
   // function.
   SDValue TOCOff = DAG.getIntPtrConstant(TOCAnchorOffset, dl);
-  SDValue AddTOC = DAG.getNode(ISD::ADD, dl, RegVT, Callee, TOCOff);
-  SDValue TOCPtr =
-      DAG.getLoad(RegVT, dl, LDChain, AddTOC,
-                  MPI.getWithOffset(TOCAnchorOffset), Alignment, MMOFlags);
+  if (PtrVT != RegVT) {
+    TOCOff = DAG.getZExtOrTrunc(TOCOff, dl, RegVT);
+  }
+  SDValue AddTOC = DAG.getNode(ISD::ADD, dl, RegVT, newCallee, TOCOff);
+  SDValue TOCPtr = DAG.getExtLoad(ISD::ZEXTLOAD, dl, RegVT, LDChain, AddTOC,
+                                  MPI.getWithOffset(TOCAnchorOffset), PtrVT,
+                                  Alignment, MMOFlags);
 
   // One for loading the environment pointer.
   SDValue PtrOff = DAG.getIntPtrConstant(EnvPtrOffset, dl);
-  SDValue AddPtr = DAG.getNode(ISD::ADD, dl, RegVT, Callee, PtrOff);
-  SDValue LoadEnvPtr =
-      DAG.getLoad(RegVT, dl, LDChain, AddPtr, MPI.getWithOffset(EnvPtrOffset),
-                  Alignment, MMOFlags);
+  if (PtrVT != RegVT) {
+    PtrOff = DAG.getZExtOrTrunc(PtrOff, dl, RegVT);
+  }
+  SDValue AddPtr = DAG.getNode(ISD::ADD, dl, RegVT, newCallee, PtrOff);
+  SDValue LoadEnvPtr = DAG.getExtLoad(ISD::ZEXTLOAD, dl, RegVT, LDChain, AddPtr,
+                                      MPI.getWithOffset(EnvPtrOffset), PtrVT,
+                                      Alignment, MMOFlags);
 
   // Then copy the newly loaded TOC anchor to the TOC pointer.
   SDValue TOCVal = DAG.getCopyToReg(Chain, dl, TOCReg, TOCPtr, Glue);
@@ -5844,6 +5857,7 @@ static void buildCallOperands(
   const bool IsPPC64 = Subtarget.isPPC64();
   // MVT for a general purpose register.
   const MVT RegVT = Subtarget.getScalarIntVT();
+  const MVT PtrVT = Subtarget.getPtrVT();
 
   // First operand is always the chain.
   Ops.push_back(Chain);
@@ -5866,10 +5880,10 @@ static void buildCallOperands(
     if (isTOCSaveRestoreRequired(Subtarget)) {
       const MCRegister StackPtrReg = Subtarget.getStackPointerRegister();
 
-      SDValue StackPtr = DAG.getRegister(StackPtrReg, RegVT);
+      SDValue StackPtr = DAG.getRegister(StackPtrReg, PtrVT);
       unsigned TOCSaveOffset = Subtarget.getFrameLowering()->getTOCSaveOffset();
       SDValue TOCOff = DAG.getIntPtrConstant(TOCSaveOffset, dl);
-      SDValue AddTOC = DAG.getNode(ISD::ADD, dl, RegVT, StackPtr, TOCOff);
+      SDValue AddTOC = DAG.getNode(ISD::ADD, dl, PtrVT, StackPtr, TOCOff);
       Ops.push_back(AddTOC);
     }
 
@@ -6533,7 +6547,8 @@ SDValue PPCTargetLowering::LowerCall_64SVR4(
   // Set up a copy of the stack pointer for use loading and storing any
   // arguments that may not fit in the registers available for argument
   // passing.
-  SDValue StackPtr = DAG.getRegister(PPC::X1, MVT::i64);
+  MVT PtrType = Subtarget.isILP32() ? MVT::i32 : MVT::i64;
+  SDValue StackPtr = DAG.getRegister(PPC::X1, PtrType);
 
   // Figure out which arguments are going to go in registers, and which in
   // memory.  Also, if this is a vararg function, floating point operations

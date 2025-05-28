@@ -316,6 +316,7 @@ struct Config {
   bool optRemarksWithHotness;
   bool picThunk;
   bool pie;
+  bool prx;
   bool printGcSections;
   bool printIcfSections;
   bool printMemoryUsage;

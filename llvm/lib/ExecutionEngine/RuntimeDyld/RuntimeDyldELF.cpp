@@ -926,7 +926,8 @@ Error RuntimeDyldELF::findOPDEntrySection(const ELFObjectFileBase &Obj,
       // The R_PPC64_ADDR64 relocation indicates the first field
       // of a .opd entry
       uint64_t TypeFunc = i->getType();
-      if (TypeFunc != ELF::R_PPC64_ADDR64) {
+      uint64_t ExpectedRelocation = Obj.getOS() == Triple::OSType::Lv2 ? ELF::R_PPC64_ADDR32 : ELF::R_PPC64_ADDR64;
+      if (TypeFunc != ExpectedRelocation) {
         ++i;
         continue;
       }
@@ -945,7 +946,7 @@ Error RuntimeDyldELF::findOPDEntrySection(const ELFObjectFileBase &Obj,
 
       // Just check if following relocation is a R_PPC64_TOC
       uint64_t TypeTOC = i->getType();
-      if (TypeTOC != ELF::R_PPC64_TOC)
+      if (TypeTOC != ELF::R_PPC64_TOC && TypeTOC != ELF::R_PPC64_TOC32)
         continue;
 
       // Finally compares the Symbol value and the target symbol offset
@@ -1958,7 +1959,7 @@ Expected<relocation_iterator> RuntimeDyldELF::processRelocationRef(
               Section.getAddressWithOffset(Section.getStubOffset()),
               AbiVariant);
           RelocationEntry RE(SectionID, StubTargetAddr - Section.getAddress(),
-                             ELF::R_PPC64_ADDR64, Value.Addend);
+                             O.getOS() == Triple::OSType::Lv2 ? ELF::R_PPC64_ADDR32 : ELF::R_PPC64_ADDR64, Value.Addend);
 
           // Generates the 64-bits address loads as exemplified in section
           // 4.5.1 in PPC64 ELF ABI.  Note that the relocations need to
@@ -2056,6 +2057,10 @@ Expected<relocation_iterator> RuntimeDyldELF::processRelocationRef(
       // symbols (in which case the addend is respected).
       if (RelType == ELF::R_PPC64_TOC) {
         RelType = ELF::R_PPC64_ADDR64;
+        if (auto Err = findPPC64TOCSection(Obj, ObjSectionToID, Value))
+          return std::move(Err);
+      } else if (RelType == ELF::R_PPC64_TOC32) {
+        RelType = ELF::R_PPC64_ADDR32;
         if (auto Err = findPPC64TOCSection(Obj, ObjSectionToID, Value))
           return std::move(Err);
       } else if (TargetName == ".TOC.") {

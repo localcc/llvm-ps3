@@ -45,6 +45,7 @@ enum EdgeKind_ppc64 : Edge::Kind {
   Delta16HI,
   Delta16LO,
   TOC,
+  TOC32,
   TOCDelta16,
   TOCDelta16DS,
   TOCDelta16HA,
@@ -390,6 +391,9 @@ inline Error applyFixup(LinkGraph &G, Block &B, const Edge &E,
   }
   case TOC:
     support::endian::write64<Endianness>(FixupPtr, TOCBase);
+    break;
+  case TOC32:
+    support::endian::write32<Endianness>(FixupPtr, TOCBase);
     break;
   case Pointer16:
   case Pointer16DS:

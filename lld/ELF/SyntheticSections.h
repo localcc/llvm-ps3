@@ -482,7 +482,6 @@ public:
   // RelocationSection<ELFT>::writeTo.
   int64_t addend;
 
-private:
   Kind kind;
   // The kind of expression used to calculate the added (required e.g. for
   // relative GOT relocations).
@@ -582,6 +581,24 @@ class RelocationSection final : public RelocationBaseSection {
 public:
   RelocationSection(Ctx &, StringRef name, bool combreloc,
                     unsigned concurrency);
+  void writeTo(uint8_t *buf) override;
+};
+
+template <class ELFT>
+class PRXRelocationSection final : public RelocationBaseSection {
+  struct PpuRelocation {
+    LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
+    Elf_Xword relocationOffset;
+    Elf_Half unk0;
+    uint8_t valueProgram;
+    uint8_t relocationProgram;
+    Elf_Word type;
+    Elf_Xword valueOffset;
+  };
+
+public:
+  PRXRelocationSection(Ctx &, StringRef name, bool combreloc,
+                       unsigned concurrency);
   void writeTo(uint8_t *buf) override;
 };
 

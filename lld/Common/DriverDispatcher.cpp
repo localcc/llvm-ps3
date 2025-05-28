@@ -81,6 +81,7 @@ static std::optional<bool> isPETarget(llvm::ArrayRef<const char *> args) {
 }
 
 static Flavor parseProgname(StringRef progname) {
+  return Gnu;
   // Use GNU driver for "ld" by default.
   if (progname == "ld")
     return Gnu;

@@ -266,6 +266,7 @@ public:
     VK_PPC_GOT_HI,          // symbol@got@h
     VK_PPC_GOT_HA,          // symbol@got@ha
     VK_PPC_TOCBASE,         // symbol@tocbase
+    VK_PPC_TOCBASE32,       // symbol@tocbase32
     VK_PPC_TOC,             // symbol@toc
     VK_PPC_TOC_LO,          // symbol@toc@l
     VK_PPC_TOC_HI,          // symbol@toc@h
@@ -368,7 +369,7 @@ public:
     VK_VE_TPOFF_LO32,  // symbol@tpoff_lo
 
     VK_TPREL,
-    VK_DTPREL
+    VK_DTPREL,
   };
 
 private:

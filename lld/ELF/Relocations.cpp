@@ -454,7 +454,10 @@ public:
   template <class ELFT>
   void scanSection(InputSectionBase &s, bool isEH = false);
 
-private:
+protected:
+  virtual InputSectionBase *getSectionForRelocations() const { return sec; }
+
+protected:
   Ctx &ctx;
   InputSectionBase *sec;
   OffsetGetter getter;
@@ -475,6 +478,16 @@ private:
   template <class ELFT, class RelTy>
   void scanOne(typename Relocs<RelTy>::const_iterator &i);
   template <class ELFT, class RelTy> void scan(Relocs<RelTy> rels);
+};
+
+class PRXRelocationScanner : public RelocationScanner {
+public:
+  PRXRelocationScanner(Ctx &ctx) : RelocationScanner(ctx) {}
+
+protected:
+  InputSectionBase *getSectionForRelocations() const override {
+    return &*sec->getPartition(ctx).relaDyn;
+  }
 };
 } // namespace
 
@@ -1510,8 +1523,8 @@ void RelocationScanner::scanOne(typename Relocs<RelTy>::const_iterator &i) {
                              sec->content().data() + rel.r_offset, type);
   if (LLVM_UNLIKELY(ctx.arg.emachine == EM_MIPS))
     addend += computeMipsAddend<ELFT>(rel, expr, sym.isLocal());
-  else if (ctx.arg.emachine == EM_PPC64 && ctx.arg.isPic && type == R_PPC64_TOC)
-    addend += getPPC64TocBase(ctx);
+  // todo(localcc): else clause removed as the addend gets added in
+  // computeRels later
 
   // Ignore R_*_NONE and other marker relocations.
   if (expr == R_NONE)
@@ -1693,12 +1706,17 @@ template <class ELFT> void elf::scanRelocations(Ctx &ctx) {
   auto outerFn = [&]() {
     for (ELFFileBase *f : ctx.objectFiles) {
       auto fn = [f, &ctx]() {
-        RelocationScanner scanner(ctx);
+        std::unique_ptr<RelocationScanner> scanner;
+        if (ctx.arg.prx)
+          scanner = std::make_unique<PRXRelocationScanner>(ctx);
+        else
+          scanner = std::make_unique<RelocationScanner>(ctx);
+
         for (InputSectionBase *s : f->getSections()) {
           if (s && s->kind() == SectionBase::Regular && s->isLive() &&
               (s->flags & SHF_ALLOC) &&
               !(s->type == SHT_ARM_EXIDX && ctx.arg.emachine == EM_ARM))
-            scanner.template scanSection<ELFT>(*s);
+            scanner->template scanSection<ELFT>(*s);
         }
       };
       if (serial)
@@ -1707,14 +1725,19 @@ template <class ELFT> void elf::scanRelocations(Ctx &ctx) {
         tg.spawn(fn);
     }
     auto scanEH = [&] {
-      RelocationScanner scanner(ctx);
+      std::unique_ptr<RelocationScanner> scanner;
+      if (ctx.arg.prx)
+        scanner = std::make_unique<PRXRelocationScanner>(ctx);
+      else
+        scanner = std::make_unique<RelocationScanner>(ctx);
+
       for (Partition &part : ctx.partitions) {
         for (EhInputSection *sec : part.ehFrame->sections)
-          scanner.template scanSection<ELFT>(*sec, /*isEH=*/true);
+          scanner->template scanSection<ELFT>(*sec, /*isEH=*/true);
         if (part.armExidx && part.armExidx->isLive())
           for (InputSection *sec : part.armExidx->exidxSections)
             if (sec->isLive())
-              scanner.template scanSection<ELFT>(*sec);
+              scanner->template scanSection<ELFT>(*sec);
       }
     };
     if (serial)

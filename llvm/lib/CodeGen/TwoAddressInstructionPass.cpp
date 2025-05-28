@@ -1823,6 +1823,9 @@ bool TwoAddressInstructionImpl::processStatepoint(
 
 /// Reduce two-address instructions to two operands.
 bool TwoAddressInstructionImpl::run() {
+  outs() << "Before two address: ";
+  MF->dump();
+
   bool MadeChange = false;
 
   LLVM_DEBUG(dbgs() << "********** REWRITING TWO-ADDR INSTRS **********\n");
@@ -1963,6 +1966,10 @@ bool TwoAddressInstructionImpl::run() {
       mi = nmi;
     }
   }
+
+  outs() << "After two address: ";
+  MF->dump();
+  outs() << "That's it";
 
   return MadeChange;
 }

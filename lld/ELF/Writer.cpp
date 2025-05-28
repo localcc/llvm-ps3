@@ -79,6 +79,7 @@ private:
   void writeSections();
   void writeSectionsBinary();
   void writeBuildId();
+  void writePRXInfo();
 
   Ctx &ctx;
   std::unique_ptr<FileOutputBuffer> &buffer;
@@ -375,6 +376,9 @@ template <class ELFT> void Writer<ELFT>::run() {
         writeTrapInstr();
       writeHeader();
       writeSections();
+      if (ctx.arg.prx) {
+        writePRXInfo();
+      }
     } else {
       writeSectionsBinary();
     }
@@ -1597,6 +1601,39 @@ template <class ELFT> void Writer<ELFT>::finalizeAddressDependentContent() {
       finalizeOrderDependentContent();
     }
   }
+
+  // copy over all relocations to rela on prx
+  // as we are never guaranteed the vaddr with prx
+  // todo(localcc): make this prettier
+  // if (ctx.arg.prx) {
+  //  for (auto &os : ctx.outputSections) {
+  //    if (!(os->flags & SHF_ALLOC) || !(os->flags & SHF_EXECINSTR))
+  //      continue;
+  //    for (SectionCommand *bc : os->commands) {
+  //      if (auto *isd = dyn_cast<InputSectionDescription>(bc)) {
+  //        for (InputSection *isec : isd->sections) {
+  //          isec->relocs().size();
+  //          for (Relocation &reloc : isec->relocs()) {
+  //            RelType rel = ctx.target->getDynRel(reloc.type);
+  //            if (rel == 0)
+  //              rel = reloc.type;
+  //            // toc relocations are correct as is
+  //            if (rel == R_PPC64_TOC16_HA || rel == R_PPC64_TOC16_LO)
+  //              continue;
+  //            Partition &part = isec->getPartition(ctx);
+
+  //            part.relaDyn->addSymbolReloc(rel, *isec, reloc.offset,
+  //            *reloc.sym,
+  //                                         reloc.addend, reloc.type);
+  //            part.relaDyn->updateAllocSize(ctx);
+  //          }
+  //        }
+  //      }
+  //    }
+  //  }
+  //  ctx.script->assignAddresses();
+  //}
+
   if (!ctx.arg.relocatable)
     ctx.target->finalizeRelax(pass);
 
@@ -2795,6 +2832,8 @@ static uint64_t getEntryAddr(Ctx &ctx) {
 }
 
 static uint16_t getELFType(Ctx &ctx) {
+  if (ctx.arg.prx)
+    return ET_PRX;
   if (ctx.arg.isPic)
     return ET_DYN;
   if (ctx.arg.relocatable)
@@ -3015,6 +3054,37 @@ template <class ELFT> void Writer<ELFT>::writeBuildId() {
   }
   for (Partition &part : ctx.partitions)
     part.buildId->writeBuildId(output);
+}
+
+template <class ELFT> void Writer<ELFT>::writePRXInfo() {
+  uint64_t sceModuleInfoOffset = -1;
+  for (auto &section : ctx.outputSections) {
+    // todo(localcc): maybe better detection?
+    if (section->name == ".rodata.sceModuleInfo") {
+      sceModuleInfoOffset = section->offset;
+    }
+  }
+
+  if (sceModuleInfoOffset == -1) {
+    Err(ctx)
+        << ".rodata.sceModuleInfo section must be present for a PRX to link!";
+    return;
+  }
+
+  for (auto &phdr : ctx.mainPart->phdrs) {
+    phdr->p_paddr = 0; // paddr is always 0 in prxes
+    if (phdr->p_type == SHT_PPURELA) {
+      phdr->p_memsz = 0;
+      phdr->p_vaddr = 0;
+    }
+  }
+
+  auto &firstHeader = ctx.mainPart->phdrs[0];
+  // first header p_addr should point to sceModuleInfo
+  firstHeader->p_paddr = sceModuleInfoOffset + firstHeader->p_offset;
+  firstHeader->p_vaddr = 0;
+
+  writePhdrs<ELFT>(ctx.bufferStart + sizeof(Elf_Ehdr), *ctx.mainPart);
 }
 
 template void elf::writeResult<ELF32LE>(Ctx &);

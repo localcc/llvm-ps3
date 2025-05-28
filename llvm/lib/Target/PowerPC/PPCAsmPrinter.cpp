@@ -1919,10 +1919,12 @@ void PPCLinuxAsmPrinter::emitInstruction(const MachineInstr *MI) {
 }
 
 void PPCLinuxAsmPrinter::emitStartOfAsmFile(Module &M) {
+  PPCTargetStreamer *TS =
+      static_cast<PPCTargetStreamer *>(OutStreamer->getTargetStreamer());
   if (static_cast<const PPCTargetMachine &>(TM).isELFv2ABI()) {
-    PPCTargetStreamer *TS =
-        static_cast<PPCTargetStreamer *>(OutStreamer->getTargetStreamer());
     TS->emitAbiVersion(2);
+  } else {
+    TS->emitAbiVersion(1);
   }
 
   if (static_cast<const PPCTargetMachine &>(TM).isPPC64() ||
@@ -2002,22 +2004,36 @@ void PPCLinuxAsmPrinter::emitFunctionEntryLabel() {
   MCSectionSubPair Current = OutStreamer->getCurrentSection();
   MCSectionELF *Section = OutStreamer->getContext().getELFSection(
       ".opd", ELF::SHT_PROGBITS, ELF::SHF_WRITE | ELF::SHF_ALLOC);
+  Align sectionAlignment =
+      TM.getTargetTriple().getOS() == Triple::Lv2 ? Align(4) : Align(8);
   OutStreamer->switchSection(Section);
   OutStreamer->emitLabel(CurrentFnSym);
-  OutStreamer->emitValueToAlignment(Align(8));
+  OutStreamer->emitValueToAlignment(sectionAlignment);
   MCSymbol *Symbol1 = CurrentFnSymForSize;
+  // todo(localcc): investigate
   // Generates a R_PPC64_ADDR64 (from FK_DATA_8) relocation for the function
   // entry point.
-  OutStreamer->emitValue(MCSymbolRefExpr::create(Symbol1, OutContext),
-                         8 /*size*/);
-  MCSymbol *Symbol2 = OutContext.getOrCreateSymbol(StringRef(".TOC."));
-  // Generates a R_PPC64_TOC relocation for TOC base insertion.
   OutStreamer->emitValue(
-      MCSymbolRefExpr::create(Symbol2, MCSymbolRefExpr::VK_PPC_TOCBASE,
-                              OutContext),
-      8 /*size*/);
-  // Emit a null environment pointer.
-  OutStreamer->emitIntValue(0, 8 /* size */);
+      MCSymbolRefExpr::create(Symbol1, OutContext),
+      TM.getPointerSize(0) /*size*/); // FIXME: default address space
+  MCSymbol *Symbol2 = OutContext.getOrCreateSymbol(StringRef(".TOC."));
+  // Generates a R_PPC64_TOC relocation for TOC base insertion, R_PPC64_TOC32
+  // for LV2 abi.
+  if (TM.getTargetTriple().getOS() == Triple::Lv2) {
+    OutStreamer->emitValue(
+        MCSymbolRefExpr::create(Symbol2, MCSymbolRefExpr::VK_PPC_TOCBASE32,
+                                OutContext),
+        4 /*size*/);
+  } else {
+    OutStreamer->emitValue(
+        MCSymbolRefExpr::create(Symbol2, MCSymbolRefExpr::VK_PPC_TOCBASE,
+                                OutContext),
+        8 /*size*/);
+  }
+  if (TM.getTargetTriple().getOS() != Triple::Lv2) {
+    // Emit a null environment pointer.
+    OutStreamer->emitIntValue(0, 8 /* size */);
+  }
   OutStreamer->switchSection(Current.first, Current.second);
 }
 

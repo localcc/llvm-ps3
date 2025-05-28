@@ -453,8 +453,13 @@ def pic_veneer
 defm pie : B<"pie", "Create a position independent executable",
              "Do not create a position independent executable (default)">;
 
-defm print_gc_sections : B<"print-gc-sections", "List removed unused sections",
-                           "Do not list removed unused sections (default)">;
+defm prx: B<"prx",
+    "Create a Sony PS3 PRX executable",
+    "Do not create a Sony PS3 PRX executable (default)">;
+
+defm print_gc_sections: B<"print-gc-sections",
+    "List removed unused sections",
+    "Do not list removed unused sections (default)">;
 
 defm print_icf_sections
     : B<"print-icf-sections", "List identical folded sections",

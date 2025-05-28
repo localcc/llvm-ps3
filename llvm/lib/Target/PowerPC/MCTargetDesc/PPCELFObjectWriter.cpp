@@ -463,6 +463,15 @@ unsigned PPCELFObjectWriter::getRelocType(MCContext &Ctx, const MCValue &Target,
       break;
     case FK_Data_4:
       switch (Modifier) {
+      case MCSymbolRefExpr::VK_PPC_TOCBASE32:
+        Type = ELF::R_PPC64_TOC32;
+        break;
+      case MCSymbolRefExpr::VK_PPC_DTPMOD:
+        Type = ELF::R_PPC64_DTPMOD32;
+        break;
+      case MCSymbolRefExpr::VK_TPREL:
+        Type = ELF::R_PPC64_TPREL32;
+        break;
       case MCSymbolRefExpr::VK_DTPREL:
         Type = ELF::R_PPC_DTPREL32;
         break;

@@ -2133,7 +2133,8 @@ unsigned PPCFastISel::PPCMaterializeGV(const GlobalValue *GV, MVT VT) {
   if (Subtarget->isUsingPCRelativeCalls())
     return false;
 
-  assert(VT == MVT::i64 && "Non-address!");
+  // (localcc): changes
+  assert(VT == TLI.getPointerTy(DL) && "Non-address!");
   const TargetRegisterClass *RC = &PPC::G8RC_and_G8RC_NOX0RegClass;
   Register DestReg = createResultReg(RC);
 

@@ -726,6 +726,9 @@ public:
     return getObjectFormat() == Triple::DXContainer;
   }
 
+  /// Tests whether the target is the PS3 Lv2 platform.
+  bool isLV2() const { return getOS() == Triple::Lv2; }
+
   /// Tests whether the target is the PS4 platform.
   bool isPS4() const {
     return getArch() == Triple::x86_64 && getVendor() == Triple::SCEI &&

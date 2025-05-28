@@ -118,6 +118,7 @@ enum {
   ET_EXEC = 2,        // Executable file
   ET_DYN = 3,         // Shared object file
   ET_CORE = 4,        // Core file
+  ET_PRX = 0xffa4,    // Sony PS3 PRX file
   ET_LOOS = 0xfe00,   // Beginning of operating system-specific codes
   ET_HIOS = 0xfeff,   // Operating system-specific
   ET_LOPROC = 0xff00, // Beginning of processor-specific codes
@@ -368,6 +369,7 @@ enum {
   ELFOSABI_ARM_FDPIC = 65,     // ARM FDPIC
   ELFOSABI_C6000_ELFABI = 64,  // Bare-metal TMS320C6000
   ELFOSABI_C6000_LINUX = 65,   // Linux TMS320C6000
+  ELFOSABI_CELLLV2 = 102,      // Cell PS3 LV2
   ELFOSABI_STANDALONE = 255,   // Standalone (embedded) application
   ELFOSABI_LAST_ARCH = 255     // Last Architecture-specific OS ABI
 };
@@ -1193,6 +1195,8 @@ enum : unsigned {
   SHT_CSKY_ATTRIBUTES = 0x70000001U,
 
   SHT_HEXAGON_ATTRIBUTES = 0x70000003U,
+
+  SHT_PPURELA = 0x700000A4U,
 
   SHT_HIPROC = 0x7fffffff, // Highest processor arch-specific type.
   SHT_LOUSER = 0x80000000, // Lowest type reserved for applications.

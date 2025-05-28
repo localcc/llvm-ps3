@@ -320,6 +320,9 @@ private:
     case ELF::R_PPC64_TOC:
       Kind = ppc64::TOC;
       break;
+    case ELF::R_PPC64_TOC32:
+      Kind = ppc64::TOC32;
+      break;
     case ELF::R_PPC64_TOC16:
       Kind = ppc64::TOCDelta16;
       break;

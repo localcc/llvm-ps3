@@ -197,6 +197,7 @@ public:
 
   bool isInGot(Ctx &ctx) const { return getGotIdx(ctx) != uint32_t(-1); }
   bool isInPlt(Ctx &ctx) const { return getPltIdx(ctx) != uint32_t(-1); }
+  bool isInOpd(Ctx &ctx) const;
 
   uint64_t getVA(Ctx &, int64_t addend = 0) const;
 
@@ -205,6 +206,8 @@ public:
   uint64_t getGotPltOffset(Ctx &) const;
   uint64_t getGotPltVA(Ctx &) const;
   uint64_t getPltVA(Ctx &) const;
+  uint64_t getOpdVA(Ctx &) const;
+  uint64_t getOpdOffset(Ctx &) const;
   uint64_t getSize() const;
   OutputSection *getOutputSection() const;
 

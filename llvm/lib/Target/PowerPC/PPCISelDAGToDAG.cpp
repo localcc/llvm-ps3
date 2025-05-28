@@ -6410,12 +6410,14 @@ void PPCDAGToDAGISel::Select(SDNode *N) {
     // [64-bit AIX]
     //   ADDItocL8(ADDIStocHA8(%x2, @sym), @sym)
 
+    EVT VT = Subtarget->getScalarIntVT();
+    EVT PtrVT = Subtarget->getPtrVT();
+
     SDValue GA = N->getOperand(0);
     SDValue TOCbase = N->getOperand(1);
 
-    EVT VT = Subtarget->getScalarIntVT();
     SDNode *Tmp = CurDAG->getMachineNode(
-        isPPC64 ? PPC::ADDIStocHA8 : PPC::ADDIStocHA, dl, VT, TOCbase, GA);
+        isPPC64 ? PPC::ADDIStocHA8 : PPC::ADDIStocHA, dl, PtrVT, TOCbase, GA);
 
     // On AIX, if the symbol has the toc-data attribute it will be defined
     // in the TOC entry, so we use an ADDItocL/ADDItocL8.
@@ -6439,8 +6441,9 @@ void PPCDAGToDAGISel::Select(SDNode *N) {
 
     assert(isPPC64 && "TOC_ENTRY already handled for 32-bit.");
     // Build the address relative to the TOC-pointer.
-    ReplaceNode(N, CurDAG->getMachineNode(PPC::ADDItocL8, dl, MVT::i64,
-                                          SDValue(Tmp, 0), GA));
+    auto *newNode =
+        CurDAG->getMachineNode(PPC::ADDItocL8, dl, PtrVT, SDValue(Tmp, 0), GA);
+    ReplaceNode(N, newNode);
     return;
   }
   case PPCISD::PPC32_PICGOT:

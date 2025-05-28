@@ -1714,8 +1714,18 @@ void PPCInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   // We can end up with self copies and similar things as a result of VSX copy
   // legalization. Promote them here.
   const TargetRegisterInfo *TRI = &getRegisterInfo();
-  if (PPC::F8RCRegClass.contains(DestReg) &&
-      PPC::VSRCRegClass.contains(SrcReg)) {
+  if (PPC::GPRCRegClass.contains(SrcReg) &&
+      PPC::G8RCRegClass.contains(DestReg)) {
+    MCRegister SuperReg =
+        TRI->getMatchingSuperReg(SrcReg, PPC::sub_32, &PPC::G8RCRegClass);
+    SrcReg = SuperReg;
+  } else if (PPC::G8RCRegClass.contains(SrcReg) &&
+             PPC::GPRCRegClass.contains(DestReg)) {
+    MCRegister SuperReg =
+        TRI->getMatchingSuperReg(DestReg, PPC::sub_32, &PPC::G8RCRegClass);
+    DestReg = SuperReg;
+  } else if (PPC::F8RCRegClass.contains(DestReg) &&
+             PPC::VSRCRegClass.contains(SrcReg)) {
     MCRegister SuperReg =
         TRI->getMatchingSuperReg(DestReg, PPC::sub_64, &PPC::VSRCRegClass);
 

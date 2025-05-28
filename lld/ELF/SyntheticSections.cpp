@@ -1637,7 +1637,7 @@ uint64_t DynamicReloc::getOffset() const {
 int64_t DynamicReloc::computeAddend(Ctx &ctx) const {
   switch (kind) {
   case AddendOnly:
-    assert(sym == nullptr);
+    // assert(sym == nullptr);
     return addend;
   case AgainstSymbol:
     assert(sym != nullptr);
@@ -1783,6 +1783,77 @@ template <class ELFT> void RelocationSection<ELFT>::writeTo(uint8_t *buf) {
     if (ctx.arg.isRela)
       p->r_addend = rel.addend;
     buf += ctx.arg.isRela ? sizeof(Elf_Rela) : sizeof(Elf_Rel);
+  }
+}
+
+template <class ELFT>
+PRXRelocationSection<ELFT>::PRXRelocationSection(Ctx &ctx, StringRef name,
+                                                 bool combreloc,
+                                                 unsigned concurrency)
+    : RelocationBaseSection(ctx, name, SHT_PPURELA, DT_RELA, DT_RELSZ,
+                            combreloc, concurrency) {
+  this->entsize = sizeof(PpuRelocation);
+}
+
+size_t
+findProgramForVirtual(const SmallVector<std::unique_ptr<PhdrEntry>, 0> &phdrs,
+                      size_t VA) {
+  size_t closestSection = -1;
+  for (size_t i = 0; i < phdrs.size(); i++) {
+    auto &phdr = phdrs[i];
+    if (phdr->p_type != PT_LOAD)
+      continue;
+
+    if (VA >= phdr->p_vaddr) {
+      closestSection = i;
+    }
+    if (VA >= phdr->p_vaddr && VA <= (phdr->p_vaddr + phdr->p_filesz)) {
+      return i;
+    }
+  }
+
+  return closestSection;
+}
+
+template <class ELFT> void PRXRelocationSection<ELFT>::writeTo(uint8_t *buf) {
+  computeRels();
+  for (const DynamicReloc &rel : relocs) {
+    auto *p = reinterpret_cast<PpuRelocation *>(buf);
+
+    // rpcs3 doesn't support these relocations, assuming the LV2 kernel doesn't
+    // either and translating them
+    RelType relType = rel.type;
+    switch (relType) {
+    case R_PPC64_RELATIVE:
+      relType = R_PPC64_ADDR32;
+      break;
+    }
+
+    uint64_t va = rel.addend;
+    if (rel.expr == R_ADDEND)
+      va = rel.sym->getVA(ctx, rel.addend);
+
+    size_t valueProgramIndex =
+        findProgramForVirtual(this->ctx.mainPart->phdrs, va);
+    assert(valueProgramIndex != -1 && "failed to get value program index");
+    auto &valueProgram = this->ctx.mainPart->phdrs[valueProgramIndex];
+
+    p->valueProgram = valueProgramIndex;
+    // todo(localcc): check if getOffset is needed here
+    p->valueOffset = va - valueProgram->p_vaddr;
+
+    size_t relocationProgramIndex =
+        findProgramForVirtual(this->ctx.mainPart->phdrs, rel.r_offset);
+    assert(relocationProgramIndex != -1 &&
+           "failed to get relocation program index");
+    auto &relocationProgram = this->ctx.mainPart->phdrs[relocationProgramIndex];
+
+    p->relocationProgram = relocationProgramIndex;
+    p->relocationOffset = rel.r_offset - relocationProgram->p_vaddr;
+
+    p->type = relType;
+
+    buf += sizeof(PpuRelocation);
   }
 }
 
@@ -4244,7 +4315,6 @@ InputSection *ARMExidxSyntheticSection::getLinkOrderDep() const {
 // 3.) A trailing EXIDX_CANTUNWIND sentinel section is required at the end of
 //     the table to terminate the address range of the final entry.
 void ARMExidxSyntheticSection::writeTo(uint8_t *buf) {
-
   // A linker generated CANTUNWIND entry is made up of two words:
   // 0x0 with R_ARM_PREL31 relocation to target.
   // 0x1 with EXIDX_CANTUNWIND.
@@ -4801,6 +4871,9 @@ template <class ELFT> void elf::createSyntheticSections(Ctx &ctx) {
     if (ctx.arg.androidPackDynRelocs)
       part.relaDyn = std::make_unique<AndroidPackedRelocationSection<ELFT>>(
           ctx, relaDynName, threadCount);
+    else if (ctx.arg.prx)
+      part.relaDyn = std::make_unique<PRXRelocationSection<ELFT>>(
+          ctx, relaDynName, ctx.arg.zCombreloc, threadCount);
     else
       part.relaDyn = std::make_unique<RelocationSection<ELFT>>(
           ctx, relaDynName, ctx.arg.zCombreloc, threadCount);

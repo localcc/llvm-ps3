@@ -499,6 +499,8 @@ void ScriptParser::readOutputFormat() {
 
   if (s.consume_back("-freebsd"))
     ctx.arg.osabi = ELFOSABI_FREEBSD;
+  if (s.consume_back("-lv2"))
+    ctx.arg.osabi = ELFOSABI_CELLLV2;
 
   std::tie(ctx.arg.ekind, ctx.arg.emachine) = parseBfdName(s);
   if (ctx.arg.emachine == EM_NONE)

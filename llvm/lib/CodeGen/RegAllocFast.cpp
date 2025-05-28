@@ -1743,6 +1743,9 @@ void RegAllocFastImpl::handleBundle(MachineInstr &MI) {
 }
 
 void RegAllocFastImpl::allocateBasicBlock(MachineBasicBlock &MBB) {
+  outs() << "MBB reg alloc before: ";
+  MBB.dump();
+
   this->MBB = &MBB;
   LLVM_DEBUG(dbgs() << "\nAllocating " << MBB);
 
@@ -1801,6 +1804,9 @@ void RegAllocFastImpl::allocateBasicBlock(MachineBasicBlock &MBB) {
   DanglingDbgValues.clear();
 
   LLVM_DEBUG(MBB.dump());
+
+  outs() << "MBB reg alloc after: ";
+  MBB.dump();
 }
 
 bool RegAllocFastImpl::runOnMachineFunction(MachineFunction &MF) {

@@ -162,7 +162,12 @@ enum class LegacyToPrefixMask : uint64_t {
       0x8000000003e00000, // S/T (6-10) - The [S/T]X bit moves from 28 to 5.
 };
 
-class PPC64 final : public TargetInfo {
+enum class ELFAbiKind {
+  ELFv1 = 0,
+  ELFv2 = 1,
+};
+
+class PPC64 : public TargetInfo {
 public:
   PPC64(Ctx &);
   int getTlsGdRelaxSkip(RelType type) const override;
@@ -193,12 +198,19 @@ public:
   bool adjustPrologueForCrossSplitStack(uint8_t *loc, uint8_t *end,
                                         uint8_t stOther) const override;
 
+  bool isELFv1() const { return abiKind == ELFAbiKind::ELFv1; }
+  bool isELFv2() const { return abiKind == ELFAbiKind::ELFv2; }
+
 private:
   void relaxTlsGdToIe(uint8_t *loc, const Relocation &rel, uint64_t val) const;
   void relaxTlsGdToLe(uint8_t *loc, const Relocation &rel, uint64_t val) const;
   void relaxTlsLdToLe(uint8_t *loc, const Relocation &rel, uint64_t val) const;
   void relaxTlsIeToLe(uint8_t *loc, const Relocation &rel, uint64_t val) const;
+
+private:
+  ELFAbiKind abiKind;
 };
+
 } // namespace
 
 uint64_t elf::getPPC64TocBase(Ctx &ctx) {
@@ -574,13 +586,22 @@ static uint64_t readPrefixedInst(Ctx &ctx, const uint8_t *loc) {
   return ctx.arg.isLE ? (fullInstr << 32 | fullInstr >> 32) : fullInstr;
 }
 
+static uint32_t getEFlags(InputFile *file) {
+  if (file->ekind == ELF64BEKind)
+    return cast<ObjFile<ELF64BE>>(file)->getObj().getHeader().e_flags;
+  return cast<ObjFile<ELF64LE>>(file)->getObj().getHeader().e_flags;
+}
+
 PPC64::PPC64(Ctx &ctx) : TargetInfo(ctx) {
+  bool isLV2 = ctx.arg.osabi == ELFOSABI_CELLLV2;
   copyRel = R_PPC64_COPY;
   gotRel = R_PPC64_GLOB_DAT;
   pltRel = R_PPC64_JMP_SLOT;
   relativeRel = R_PPC64_RELATIVE;
   iRelativeRel = R_PPC64_IRELATIVE;
-  symbolicRel = R_PPC64_ADDR64;
+  symbolicRel = isLV2 ? R_PPC64_ADDR32
+                      : R_PPC64_ADDR64; // todo(localcc): improve this to use a
+                                        // separate class with inheritance
   pltHeaderSize = 60;
   pltEntrySize = 4;
   ipltEntrySize = 16; // PPC64PltCallStub::size
@@ -588,10 +609,39 @@ PPC64::PPC64(Ctx &ctx) : TargetInfo(ctx) {
   gotPltHeaderEntriesNum = 2;
   needsThunks = true;
 
-  tlsModuleIndexRel = R_PPC64_DTPMOD64;
-  tlsOffsetRel = R_PPC64_DTPREL64;
+  uint32_t prevFlag = -1;
+  for (InputFile *f : ctx.objectFiles) {
+    uint32_t flag = getEFlags(f);
+    if (prevFlag == -1)
+      prevFlag = flag;
 
-  tlsGotRel = R_PPC64_TPREL64;
+    if (flag != prevFlag) {
+      ErrAlways(ctx) << "ELFv1/ELFv2 object file abi mismatch";
+    }
+    prevFlag = flag;
+  }
+
+  if (prevFlag != 1 && ctx.arg.prx) {
+    ErrAlways(ctx) << "PRX can only link from ELFv1";
+  }
+
+  if (prevFlag == 1 || ctx.arg.prx) {
+    abiKind = ELFAbiKind::ELFv1;
+  } else {
+    abiKind = ELFAbiKind::ELFv2;
+  }
+
+  tlsModuleIndexRel =
+      isLV2 ? R_PPC64_DTPMOD32
+            : R_PPC64_DTPMOD64; // todo(localcc): improve this to use a separate
+                                // class with inheritance
+  tlsOffsetRel =
+      isLV2
+          ? R_PPC64_DTPREL32
+          : R_PPC64_DTPREL64; // todo(localcc): also investigate the possibility
+                              // of just using PPC instead of PPC64
+
+  tlsGotRel = isLV2 ? R_PPC64_TPREL32 : R_PPC64_TPREL64;
 
   needsMoreStackNonSplit = false;
 
@@ -626,20 +676,10 @@ int PPC64::getTlsGdRelaxSkip(RelType type) const {
   return 1;
 }
 
-static uint32_t getEFlags(InputFile *file) {
-  if (file->ekind == ELF64BEKind)
-    return cast<ObjFile<ELF64BE>>(file)->getObj().getHeader().e_flags;
-  return cast<ObjFile<ELF64LE>>(file)->getObj().getHeader().e_flags;
-}
-
-// This file implements v2 ABI. This function makes sure that all
-// object files have v2 or an unspecified version as an ABI version.
 uint32_t PPC64::calcEFlags() const {
   for (InputFile *f : ctx.objectFiles) {
     uint32_t flag = getEFlags(f);
-    if (flag == 1)
-      ErrAlways(ctx) << f << ": ABI version 1 is not supported";
-    else if (flag > 2)
+    if (flag > 2)
       ErrAlways(ctx) << f << ": unrecognized e_flags: " << flag;
   }
   return 2;
@@ -1027,6 +1067,7 @@ RelExpr PPC64::getRelExpr(RelType type, const Symbol &s,
   case R_PPC64_TOC16_LO_DS:
     return ctx.arg.tocOptimize ? RE_PPC64_RELAX_TOC : R_GOTREL;
   case R_PPC64_TOC:
+  case R_PPC64_TOC32:
     return RE_PPC64_TOCBASE;
   case R_PPC64_REL14:
   case R_PPC64_REL24:
@@ -1088,6 +1129,7 @@ RelExpr PPC64::getRelExpr(RelType type, const Symbol &s,
   case R_PPC64_DTPREL16_LO_DS:
   case R_PPC64_DTPREL64:
   case R_PPC64_DTPREL34:
+  case R_PPC64_DTPREL32:
     return R_DTPREL;
   case R_PPC64_TLSGD:
     return R_TLSDESC_CALL;
@@ -1105,6 +1147,8 @@ RelExpr PPC64::getRelExpr(RelType type, const Symbol &s,
 RelType PPC64::getDynRel(RelType type) const {
   if (type == R_PPC64_ADDR64 || type == R_PPC64_TOC)
     return R_PPC64_ADDR64;
+  if (type == R_PPC64_ADDR32 || type == R_PPC64_TOC32)
+    return R_PPC64_ADDR32;
   return R_PPC64_NONE;
 }
 
@@ -1124,6 +1168,11 @@ int64_t PPC64::getImplicitAddend(const uint8_t *buf, RelType type) const {
   case R_PPC64_DTPREL64:
   case R_PPC64_TPREL64:
     return read64(ctx, buf);
+  case R_PPC64_ADDR32:
+  case R_PPC64_DTPMOD32:
+  case R_PPC64_DTPREL32:
+  case R_PPC64_TPREL32:
+    return read32(ctx, buf);
   default:
     InternalErr(ctx, buf) << "cannot read addend for relocation " << type;
     return 0;
@@ -1236,6 +1285,8 @@ static std::pair<RelType, uint64_t> toAddr16Rel(RelType type, uint64_t val) {
     return {R_PPC64_ADDR16_LO_DS, dtpBiasedVal};
   case R_PPC64_DTPREL64:
     return {R_PPC64_ADDR64, dtpBiasedVal};
+  case R_PPC64_DTPREL32:
+    return {R_PPC64_ADDR32, dtpBiasedVal};
 
   default:
     return {type, val};
@@ -1373,6 +1424,10 @@ void PPC64::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   case R_PPC64_TOC:
     write64(ctx, loc, val);
     break;
+  case R_PPC64_TOC32:
+    checkIntUInt(ctx, loc, val, 32, rel);
+    write32(ctx, loc, val);
+    break;
   case R_PPC64_REL14: {
     uint32_t mask = 0x0000FFFC;
     checkInt(ctx, loc, val, 16, rel);
@@ -1390,6 +1445,9 @@ void PPC64::relocate(uint8_t *loc, const Relocation &rel, uint64_t val) const {
   }
   case R_PPC64_DTPREL64:
     write64(ctx, loc, val - dynamicThreadPointerOffset);
+    break;
+  case R_PPC64_DTPREL32:
+    write32(ctx, loc, val - dynamicThreadPointerOffset);
     break;
   case R_PPC64_DTPREL34:
     // The Dynamic Thread Vector actually points 0x8000 bytes past the start
@@ -1428,7 +1486,7 @@ bool PPC64::needsThunk(RelExpr expr, RelType type, const InputFile *file,
     return false;
 
   // If a function is in the Plt it needs to be called with a call-stub.
-  if (s.isInPlt(ctx))
+  if (s.isInPlt(ctx) || s.isInOpd(ctx))
     return true;
 
   // This check looks at the st_other bits of the callee with relocation

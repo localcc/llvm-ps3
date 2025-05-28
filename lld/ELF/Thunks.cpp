@@ -480,6 +480,16 @@ public:
                         const Relocation &rel) const override;
 };
 
+class PPC64OpdCallStub final : public Thunk {
+public:
+  PPC64OpdCallStub(Ctx &ctx, Symbol &dest) : Thunk(ctx, dest, 0) {}
+  uint32_t size() override { return 24; } // todo(localcc): actual size
+  void writeTo(uint8_t *buf) override;
+  void addSymbols(ThunkSection &isec) override;
+  bool isCompatibleWith(const InputSection &isec,
+                        const Relocation &rel) const override;
+};
+
 // PPC64 R2 Save Stub
 // When the caller requires a valid R2 TOC pointer but the callee does not
 // require a TOC pointer and the callee cannot guarantee that it doesn't
@@ -1354,6 +1364,17 @@ void elf::writePPC64LoadAndBranch(Ctx &ctx, uint8_t *buf, int64_t offset) {
   write32(ctx, buf + 12, 0x4e800420);        // bctr
 }
 
+void writePPC32LoadAndBranch(Ctx &ctx, uint8_t *buf, int64_t offset) {
+  // todo(localcc): this probably also has to load new toc pointer
+  uint16_t offHa = (offset + 0x8000) >> 16;
+  uint16_t offLo = offset & 0xffff;
+
+  write32(ctx, buf + 0, 0x3d820000 | offHa); // addis r12, r2, OffHa
+  write32(ctx, buf + 4, 0x818c0000 | offLo); // lwz    r12, OffLo(r12)
+  write32(ctx, buf + 8, 0x7d8903a6);         // mtctr r12
+  write32(ctx, buf + 12, 0x4e800420);        // bctr
+}
+
 void PPC64PltCallStub::writeTo(uint8_t *buf) {
   int64_t offset = destination.getGotPltVA(ctx) - getPPC64TocBase(ctx);
   // Save the TOC pointer to the save-slot reserved in the call frame.
@@ -1369,6 +1390,25 @@ void PPC64PltCallStub::addSymbols(ThunkSection &isec) {
 }
 
 bool PPC64PltCallStub::isCompatibleWith(const InputSection &isec,
+                                        const Relocation &rel) const {
+  return rel.type == R_PPC64_REL24 || rel.type == R_PPC64_REL14;
+}
+
+void PPC64OpdCallStub::writeTo(uint8_t *buf) {
+  int64_t offset = destination.getOpdVA(ctx) - getPPC64TocBase(ctx);
+  // Save the TOC pointer to the save-slot reserved in the call frame.
+  write32(ctx, buf + 0, 0xf8410028); // std     r2,24(r1)
+  writePPC32LoadAndBranch(ctx, buf + 4, offset);
+}
+
+void PPC64OpdCallStub::addSymbols(ThunkSection &isec) {
+  Defined *s = addSymbol(ctx.saver.save("__opd_" + destination.getName()),
+                         STT_FUNC, 0, isec);
+  s->setNeedsTocRestore(true);
+  s->file = destination.file;
+}
+
+bool PPC64OpdCallStub::isCompatibleWith(const InputSection &isec,
                                         const Relocation &rel) const {
   return rel.type == R_PPC64_REL24 || rel.type == R_PPC64_REL14;
 }
@@ -1675,11 +1715,17 @@ static std::unique_ptr<Thunk> addThunkPPC64(Ctx &ctx, RelType type, Symbol &s,
   if (type == R_PPC64_REL24_NOTOC)
     ctx.target->ppc64DynamicSectionOpt = 0x2;
 
-  if (s.isInPlt(ctx)) {
+  bool isInPlt = s.isInPlt(ctx);
+  bool isInOpd = s.isInOpd(ctx);
+  if (isInPlt || isInOpd) {
     if (type == R_PPC64_REL24_NOTOC)
       return std::make_unique<PPC64R12SetupStub>(ctx, s,
                                                  /*gotPlt=*/true);
-    return std::make_unique<PPC64PltCallStub>(ctx, s);
+
+    if (isInPlt)
+      return std::make_unique<PPC64PltCallStub>(ctx, s);
+    else if (isInOpd)
+      return std::make_unique<PPC64OpdCallStub>(ctx, s);
   }
 
   // This check looks at the st_other bits of the callee. If the value is 1

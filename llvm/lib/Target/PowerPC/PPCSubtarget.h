@@ -210,6 +210,8 @@ public:
   bool isTargetMachO() const { return TargetTriple.isOSBinFormatMachO(); }
   bool isTargetLinux() const { return TargetTriple.isOSLinux(); }
 
+  bool isILP32() const { return TargetTriple.isLV2(); }
+
   bool isAIXABI() const { return TargetTriple.isOSAIX(); }
   bool isSVR4ABI() const { return !isAIXABI(); }
   bool isELFv2ABI() const;
@@ -245,6 +247,7 @@ public:
   bool isGVIndirectSymbol(const GlobalValue *GV) const;
 
   MVT getScalarIntVT() const { return isPPC64() ? MVT::i64 : MVT::i32; }
+  MVT getPtrVT() const { return isILP32() ? MVT::i32 : getScalarIntVT(); }
 
   /// Calculates the effective code model for argument GV.
   CodeModel::Model getCodeModel(const TargetMachine &TM,
@@ -260,13 +263,13 @@ public:
   unsigned descriptorTOCAnchorOffset() const {
     assert(usesFunctionDescriptors() &&
            "Should only be called when the target uses descriptors.");
-    return IsPPC64 ? 8 : 4;
+    return (IsPPC64 && !isILP32()) ? 8 : 4;
   }
 
   unsigned descriptorEnvironmentPointerOffset() const {
     assert(usesFunctionDescriptors() &&
            "Should only be called when the target uses descriptors.");
-    return IsPPC64 ? 16 : 8;
+    return (IsPPC64 && !isILP32()) ? 16 : 8;
   }
 
   MCRegister getEnvironmentPointerRegister() const {

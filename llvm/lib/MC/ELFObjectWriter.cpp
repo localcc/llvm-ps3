@@ -1265,6 +1265,7 @@ bool ELFObjectWriter::shouldRelocateWithSymbol(const MCAssembler &Asm,
   // object file. Since the symbol is undefined, returning false results
   // in a relocation with a null section which is the desired result.
   case MCSymbolRefExpr::VK_PPC_TOCBASE:
+  case MCSymbolRefExpr::VK_PPC_TOCBASE32:
     return false;
 
   // These VariantKind cause the relocation to refer to something other than

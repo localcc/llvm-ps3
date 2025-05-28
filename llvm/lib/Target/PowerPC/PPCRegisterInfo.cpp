@@ -193,11 +193,12 @@ PPCRegisterInfo::getPointerRegClass(const MachineFunction &MF,
   // Note that PPCInstrInfo::foldImmediate also directly uses this Kind value
   // when it checks for ZERO folding.
   if (Kind == 1) {
-    if (TM.isPPC64())
+    if (TM.isPPC64() && !TM.isILP32())
       return &PPC::G8RC_NOX0RegClass;
     return &PPC::GPRC_NOR0RegClass;
   }
 
+  // todo(localcc): check this for ilp32
   if (TM.isPPC64())
     return &PPC::G8RCRegClass;
   return &PPC::GPRCRegClass;

@@ -147,6 +147,14 @@ static uint64_t getSymVA(Ctx &ctx, const Symbol &sym, int64_t addend) {
   llvm_unreachable("invalid symbol kind");
 }
 
+bool Symbol::isInOpd(Ctx &ctx) const {
+  // todo(localcc): better detection
+  if (auto *defined = dyn_cast<Defined>(this)) {
+    return defined->section->name == ".opd";
+  }
+  return false;
+}
+
 uint64_t Symbol::getVA(Ctx &ctx, int64_t addend) const {
   return getSymVA(ctx, *this, addend) + addend;
 }
@@ -186,6 +194,23 @@ uint64_t Symbol::getPltVA(Ctx &ctx) const {
   if (ctx.arg.emachine == EM_MIPS && isMicroMips(ctx))
     outVA |= 1;
   return outVA;
+}
+
+uint64_t Symbol::getOpdVA(Ctx &ctx) const {
+  // todo(localcc): better detection
+  if (auto *defined = dyn_cast<Defined>(this)) {
+    return defined->section->getVA(defined->value);
+  }
+
+  return 0x0;
+}
+
+uint64_t Symbol::getOpdOffset(Ctx &ctx) const {
+  if (auto *defined = dyn_cast<Defined>(this)) {
+    return defined->value;
+  }
+
+  return 0x0;
 }
 
 uint64_t Symbol::getSize() const {
