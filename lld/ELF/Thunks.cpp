@@ -1397,7 +1397,7 @@ bool PPC64PltCallStub::isCompatibleWith(const InputSection &isec,
 void PPC64OpdCallStub::writeTo(uint8_t *buf) {
   int64_t offset = destination.getOpdVA(ctx) - getPPC64TocBase(ctx);
   // Save the TOC pointer to the save-slot reserved in the call frame.
-  write32(ctx, buf + 0, 0xf8410028); // std     r2,24(r1)
+  write32(ctx, buf + 0, 0xf8410028); // std     r2,40(r1)
   writePPC32LoadAndBranch(ctx, buf + 4, offset);
 }
 
@@ -1724,7 +1724,8 @@ static std::unique_ptr<Thunk> addThunkPPC64(Ctx &ctx, RelType type, Symbol &s,
 
     if (isInPlt)
       return std::make_unique<PPC64PltCallStub>(ctx, s);
-    else if (isInOpd)
+    else if (isInOpd) // todo(localcc): add relaxation for this stub when it's
+                      // not needed
       return std::make_unique<PPC64OpdCallStub>(ctx, s);
   }
 

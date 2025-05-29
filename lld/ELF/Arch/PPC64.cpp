@@ -1674,7 +1674,11 @@ void PPC64::relocateAlloc(InputSectionBase &sec, uint8_t *buf) const {
                    << " lacks nop, can't restore toc";
           break;
         }
-        write32(ctx, loc + 4, 0xe8410018); // ld %r2, 24(%r1)
+        if (isELFv1()) {
+          write32(ctx, loc + 4, 0xe8410028); // ld %r2, 40(%r1)
+        } else {
+          write32(ctx, loc + 4, 0xe8410018); // ld %r2, 24(%r1)
+        }
       }
       relocate(loc, rel, val);
       break;
