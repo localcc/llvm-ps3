@@ -328,7 +328,7 @@ void GnuPropertySection::writeTo(uint8_t *buf) {
   write32(ctx, buf, 4);                          // Name size
   write32(ctx, buf + 4, getSize() - 16);         // Content size
   write32(ctx, buf + 8, NT_GNU_PROPERTY_TYPE_0); // Type
-  memcpy(buf + 12, "GNU", 4);               // Name string
+  memcpy(buf + 12, "GNU", 4);                    // Name string
 
   uint32_t featureAndType = ctx.arg.emachine == EM_AARCH64
                                 ? GNU_PROPERTY_AARCH64_FEATURE_1_AND
@@ -370,7 +370,7 @@ void BuildIdSection::writeTo(uint8_t *buf) {
   write32(ctx, buf, 4);                   // Name size
   write32(ctx, buf + 4, hashSize);        // Content size
   write32(ctx, buf + 8, NT_GNU_BUILD_ID); // Type
-  memcpy(buf + 12, "GNU", 4);           // Name string
+  memcpy(buf + 12, "GNU", 4);             // Name string
   hashBuf = buf + 16;
 }
 
@@ -460,8 +460,7 @@ void EhFrameSection::addRecords(EhInputSection *sec, ArrayRef<RelTy> rels) {
   }
 }
 
-template <class ELFT>
-void EhFrameSection::addSectionAux(EhInputSection *sec) {
+template <class ELFT> void EhFrameSection::addSectionAux(EhInputSection *sec) {
   if (!sec->isLive())
     return;
   const RelsOrRelas<ELFT> rels =
@@ -924,7 +923,7 @@ void MipsGotSection::build() {
   // to `Local16` list. Preemptible symbol might become non-preemptible
   // one if, for example, it gets a related copy relocation.
   for (FileGot &got : gots) {
-    for (auto &p: got.global)
+    for (auto &p : got.global)
       if (!p.first->isPreemptible)
         got.local16.insert({{p.first, 0}, 0});
     got.global.remove_if([&](const std::pair<Symbol *, size_t> &p) {
@@ -1017,15 +1016,15 @@ void MipsGotSection::build() {
       p.second.firstIndex = index;
       index += p.second.count;
     }
-    for (auto &p: got.local16)
+    for (auto &p : got.local16)
       p.second = index++;
-    for (auto &p: got.global)
+    for (auto &p : got.global)
       p.second = index++;
-    for (auto &p: got.relocs)
+    for (auto &p : got.relocs)
       p.second = index++;
-    for (auto &p: got.tls)
+    for (auto &p : got.tls)
       p.second = index++;
-    for (auto &p: got.dynTlsSymbols) {
+    for (auto &p : got.dynTlsSymbols) {
       p.second = index;
       index += 2;
     }
@@ -1482,20 +1481,20 @@ DynamicSection<ELFT>::computeContents() {
       addInSec(DT_PLTGOT, *ctx.in.plt);
       break;
     case EM_AARCH64:
-      if (llvm::find_if(ctx.in.relaPlt->relocs, [&ctx = ctx](
-                                                    const DynamicReloc &r) {
-            return r.type == ctx.target->pltRel &&
-                   r.sym->stOther & STO_AARCH64_VARIANT_PCS;
-          }) != ctx.in.relaPlt->relocs.end())
+      if (llvm::find_if(ctx.in.relaPlt->relocs,
+                        [&ctx = ctx](const DynamicReloc &r) {
+                          return r.type == ctx.target->pltRel &&
+                                 r.sym->stOther & STO_AARCH64_VARIANT_PCS;
+                        }) != ctx.in.relaPlt->relocs.end())
         addInt(DT_AARCH64_VARIANT_PCS, 0);
       addInSec(DT_PLTGOT, *ctx.in.gotPlt);
       break;
     case EM_RISCV:
-      if (llvm::any_of(ctx.in.relaPlt->relocs, [&ctx = ctx](
-                                                   const DynamicReloc &r) {
-            return r.type == ctx.target->pltRel &&
-                   (r.sym->stOther & STO_RISCV_VARIANT_CC);
-          }))
+      if (llvm::any_of(ctx.in.relaPlt->relocs,
+                       [&ctx = ctx](const DynamicReloc &r) {
+                         return r.type == ctx.target->pltRel &&
+                                (r.sym->stOther & STO_RISCV_VARIANT_CC);
+                       }))
         addInt(DT_RISCV_VARIANT_CC, 0);
       [[fallthrough]];
     default:
@@ -1512,7 +1511,8 @@ DynamicSection<ELFT>::computeContents() {
       addInt(DT_AARCH64_PAC_PLT, 0);
 
     if (hasMemtag(ctx)) {
-      addInt(DT_AARCH64_MEMTAG_MODE, ctx.arg.androidMemtagMode == NT_MEMTAG_LEVEL_ASYNC);
+      addInt(DT_AARCH64_MEMTAG_MODE,
+             ctx.arg.androidMemtagMode == NT_MEMTAG_LEVEL_ASYNC);
       addInt(DT_AARCH64_MEMTAG_HEAP, ctx.arg.androidMemtagHeap);
       addInt(DT_AARCH64_MEMTAG_STACK, ctx.arg.androidMemtagStack);
       if (ctx.mainPart->memtagGlobalDescriptors->isNeeded()) {
@@ -4139,7 +4139,8 @@ static bool isDuplicateArmExidxSec(Ctx &ctx, InputSection *prev,
   if (cur == nullptr)
     return prevUnwind == 1;
 
-  for (uint32_t offset = 4; offset < (uint32_t)cur->content().size(); offset +=8) {
+  for (uint32_t offset = 4; offset < (uint32_t)cur->content().size();
+       offset += 8) {
     uint32_t curUnwind = read32(ctx, cur->content().data() + offset);
     if (isExtabRef(curUnwind) || curUnwind != prevUnwind)
       return false;
@@ -4648,7 +4649,8 @@ createMemtagGlobalDescriptors(Ctx &ctx,
     const uint64_t stepToEncode = ((addr - lastGlobalEnd) / kMemtagGranuleSize)
                                   << kMemtagStepSizeBits;
     if (sizeToEncode < (1 << kMemtagStepSizeBits)) {
-      sectionSize += computeOrWriteULEB128(stepToEncode | sizeToEncode, buf, sectionSize);
+      sectionSize +=
+          computeOrWriteULEB128(stepToEncode | sizeToEncode, buf, sectionSize);
     } else {
       sectionSize += computeOrWriteULEB128(stepToEncode, buf, sectionSize);
       sectionSize += computeOrWriteULEB128(sizeToEncode - 1, buf, sectionSize);

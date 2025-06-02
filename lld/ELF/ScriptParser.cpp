@@ -899,8 +899,7 @@ Expr ScriptParser::readAssert() {
   };
 }
 
-#define ECase(X)                                                               \
-  { #X, X }
+#define ECase(X) {#X, X}
 constexpr std::pair<const char *, unsigned> typeMap[] = {
     ECase(SHT_PROGBITS),   ECase(SHT_NOTE),       ECase(SHT_NOBITS),
     ECase(SHT_INIT_ARRAY), ECase(SHT_FINI_ARRAY), ECase(SHT_PREINIT_ARRAY),

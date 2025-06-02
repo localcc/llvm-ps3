@@ -29,7 +29,7 @@ class Constant;
 class GlobalValue;
 class Type;
 class Value;
-}
+} // namespace llvm
 
 namespace clang {
 class Decl;
@@ -175,9 +175,9 @@ public:
   /// Performs a target specific test of a floating point value for things
   /// like IsNaN, Infinity, ... Nullptr is returned if no implementation
   /// exists.
-  virtual llvm::Value *
-  testFPKind(llvm::Value *V, unsigned BuiltinID, CGBuilderTy &Builder,
-             CodeGenModule &CGM) const {
+  virtual llvm::Value *testFPKind(llvm::Value *V, unsigned BuiltinID,
+                                  CGBuilderTy &Builder,
+                                  CodeGenModule &CGM) const {
     assert(V->getType()->isFloatingPointTy() && "V should have an FP type.");
     return nullptr;
   }
@@ -303,7 +303,8 @@ public:
   /// \return ConstantPointerNull with the given type \p T.
   /// Each target can override it to return its own desired constant value.
   virtual llvm::Constant *getNullPointer(const CodeGen::CodeGenModule &CGM,
-      llvm::PointerType *T, QualType QT) const;
+                                         llvm::PointerType *T,
+                                         QualType QT) const;
 
   /// Get target favored AST address space of a global variable for languages
   /// other than OpenCL and CUDA.

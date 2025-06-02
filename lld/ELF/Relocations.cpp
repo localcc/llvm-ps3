@@ -1027,7 +1027,7 @@ bool RelocationScanner::isStaticLinkTimeConstant(RelExpr e, RelType type,
   // We set the final symbols values for linker script defined symbols later.
   // They always can be computed as a link time constant.
   if (sym.scriptDefined)
-      return true;
+    return true;
 
   auto diag = Err(ctx);
   diag << "relocation " << type << " cannot refer to absolute symbol: " << &sym;

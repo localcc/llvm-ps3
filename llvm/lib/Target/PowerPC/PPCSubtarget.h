@@ -36,7 +36,7 @@ class SelectionDAGTargetInfo;
 class StringRef;
 
 namespace PPC {
-  // -m directive values.
+// -m directive values.
 enum {
   DIR_NONE,
   DIR_32,
@@ -65,17 +65,13 @@ enum {
   DIR_PWR_FUTURE,
   DIR_64
 };
-}
+} // namespace PPC
 
 class GlobalValue;
 
 class PPCSubtarget : public PPCGenSubtargetInfo {
 public:
-  enum POPCNTDKind {
-    POPCNTD_Unavailable,
-    POPCNTD_Slow,
-    POPCNTD_Fast
-  };
+  enum POPCNTDKind { POPCNTD_Unavailable, POPCNTD_Slow, POPCNTD_Fast };
 
 protected:
   /// TargetTriple - What processor and OS we're targeting.
@@ -190,11 +186,9 @@ public:
   bool GETTER() const { return ATTRIBUTE; }
 #include "PPCGenSubtargetInfo.inc"
 
-  Align getPlatformStackAlignment() const {
-    return Align(16);
-  }
+  Align getPlatformStackAlignment() const { return Align(16); }
 
-  unsigned  getRedZoneSize() const {
+  unsigned getRedZoneSize() const {
     if (isPPC64())
       // 288 bytes = 18*8 (FPRs) + 18*8 (GPRs, GPR13 reserved)
       return 288;
@@ -278,7 +272,7 @@ public:
   MCRegister getEnvironmentPointerRegister() const {
     assert(usesFunctionDescriptors() &&
            "Should only be called when the target uses descriptors.");
-     return IsPPC64 ? PPC::X11 : PPC::R11;
+    return IsPPC64 ? PPC::X11 : PPC::R11;
   }
 
   MCRegister getTOCPointerRegister() const {
@@ -319,6 +313,6 @@ public:
   const LegalizerInfo *getLegalizerInfo() const override;
   InstructionSelector *getInstructionSelector() const override;
 };
-} // End llvm namespace
+} // namespace llvm
 
 #endif
