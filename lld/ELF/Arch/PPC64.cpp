@@ -198,8 +198,8 @@ public:
   bool adjustPrologueForCrossSplitStack(uint8_t *loc, uint8_t *end,
                                         uint8_t stOther) const override;
 
-  bool isELFv1() const { return abiKind == ELFAbiKind::ELFv1; }
-  bool isELFv2() const { return abiKind == ELFAbiKind::ELFv2; }
+  bool isELFv1() const override { return abiKind == ELFAbiKind::ELFv1; }
+  bool isELFv2() const override { return abiKind == ELFAbiKind::ELFv2; }
 
 private:
   void relaxTlsGdToIe(uint8_t *loc, const Relocation &rel, uint64_t val) const;
@@ -616,7 +616,8 @@ PPC64::PPC64(Ctx &ctx) : TargetInfo(ctx) {
       prevFlag = flag;
 
     if (flag != prevFlag) {
-      ErrAlways(ctx) << "ELFv1/ELFv2 object file abi mismatch";
+      ErrAlways(ctx) << "ELFv1/ELFv2 object file abi mismatch for "
+                     << f->getName();
     }
     prevFlag = flag;
   }
@@ -682,7 +683,7 @@ uint32_t PPC64::calcEFlags() const {
     if (flag > 2)
       ErrAlways(ctx) << f << ": unrecognized e_flags: " << flag;
   }
-  return 2;
+  return isELFv1() ? 1 : 2;
 }
 
 void PPC64::relaxGot(uint8_t *loc, const Relocation &rel, uint64_t val) const {
@@ -1674,6 +1675,14 @@ void PPC64::relocateAlloc(InputSectionBase &sec, uint8_t *buf) const {
                    << " lacks nop, can't restore toc";
           break;
         }
+
+        if (sec.name == ".opd" && read32(ctx, loc + 4) != 0x60000000) {
+          Err(ctx) << getErrorLoc(ctx, loc) << ".opd branch to "
+                   << toStr(ctx, *rel.sym).substr(6)
+                   << "needing a TOC restore doesn't have a nop "
+                      "following it, cannot link.";
+        }
+
         if (isELFv1()) {
           write32(ctx, loc + 4, 0xe8410028); // ld %r2, 40(%r1)
         } else {

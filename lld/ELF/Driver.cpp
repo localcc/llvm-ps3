@@ -1403,6 +1403,7 @@ static void readConfigs(Ctx &ctx, opt::InputArgList &args) {
   if (auto *arg = args.getLastArg(OPT_package_metadata))
     parsePackageMetadata(ctx, *arg);
   ctx.arg.prx = args.hasFlag(OPT_prx, OPT_no_prx, false);
+  Warn(ctx) << "is prx: " << ctx.arg.prx;
   ctx.arg.pie = args.hasFlag(OPT_pie, OPT_no_pie, false) || ctx.arg.prx;
   ctx.arg.printIcfSections =
       args.hasFlag(OPT_print_icf_sections, OPT_no_print_icf_sections, false);

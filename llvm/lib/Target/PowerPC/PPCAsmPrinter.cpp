@@ -2020,7 +2020,7 @@ void PPCLinuxAsmPrinter::emitFunctionEntryLabel() {
   // Generates a R_PPC64_TOC relocation for TOC base insertion, R_PPC64_TOC32
   // for LV2 abi.
   if (TM.getTargetTriple().getOS() == Triple::Lv2) {
-    OutStreamer->emitValue(
+  OutStreamer->emitValue(
         MCSymbolRefExpr::create(Symbol2, MCSymbolRefExpr::VK_PPC_TOCBASE32,
                                 OutContext),
         4 /*size*/);

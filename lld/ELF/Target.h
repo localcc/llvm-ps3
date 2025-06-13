@@ -84,8 +84,7 @@ public:
                                                 uint8_t stOther) const;
 
   // Return true if we can reach dst from src with RelType type.
-  virtual bool inBranchRange(RelType type, uint64_t src,
-                             uint64_t dst) const;
+  virtual bool inBranchRange(RelType type, uint64_t src, uint64_t dst) const;
 
   virtual void relocate(uint8_t *loc, const Relocation &rel,
                         uint64_t val) const = 0;
@@ -101,6 +100,9 @@ public:
 
   virtual void applyJumpInstrMod(uint8_t *loc, JumpModType type,
                                  JumpModType val) const {}
+
+  virtual bool isELFv1() const { return false; }
+  virtual bool isELFv2() const { return true; }
 
   virtual ~TargetInfo();
 

@@ -827,7 +827,8 @@ static bool maybeReportUndefined(Ctx &ctx, Undefined &sym,
   // PPC32 .got2 is similar but cannot be fixed. Multiple .got2 is infeasible
   // because .LC0-.LTOC is not representable if the two labels are in different
   // .got2
-  if (sym.discardedSecIdx != 0 && (sec.name == ".got2" || sec.name == ".toc"))
+  if (sym.discardedSecIdx != 0 &&
+      (sec.name == ".got2" || sec.name == ".toc" || sec.name == ".opd"))
     return false;
 
   bool isWarning =
@@ -1016,6 +1017,11 @@ bool RelocationScanner::isStaticLinkTimeConstant(RelExpr e, RelType type,
   if (e == R_SIZE || e == RE_RISCV_LEB128)
     return true;
 
+  // todo(localcc): add elfv1 abi check
+  // global non preemptible symbols are link time constants in elfv1
+  if (ctx.arg.emachine == EM_PPC64 && !sym.isPreemptible && sym.isGlobal())
+    return true;
+
   // For the target and the relocation, we want to know if they are
   // absolute or relative.
   bool absVal = isAbsoluteValue(sym);
@@ -1082,8 +1088,8 @@ void RelocationScanner::processAux(RelExpr expr, RelType type, uint64_t offset,
     } else if (!isAbsoluteValue(sym)) {
       expr = ctx.target->adjustGotPcExpr(type, addend,
                                          sec->content().data() + offset);
-      // If the target adjusted the expression to R_RELAX_GOT_PC, we may end up
-      // needing the GOT if we can't relax everything.
+      // If the target adjusted the expression to R_RELAX_GOT_PC, we may end
+      // up needing the GOT if we can't relax everything.
       if (expr == R_RELAX_GOT_PC)
         ctx.in.got->hasGotOffRel.store(true, std::memory_order_relaxed);
     }
@@ -1157,6 +1163,17 @@ void RelocationScanner::processAux(RelExpr expr, RelType type, uint64_t offset,
     RelType rel = ctx.target->getDynRel(type);
     if (oneof<R_GOT, RE_LOONGARCH_GOT>(expr) ||
         (rel == ctx.target->symbolicRel && !sym.isPreemptible)) {
+      // todo(localcc): ugly stupid hack to make ld.so _start at least get
+      // called i am not quite sure how to solve this properly binutils just
+      // applies most of the relocations it emits, because there's really no
+      // harm in doing so except longer link times if the dynamic linker is
+      // available when loading the binary it will just overwrite the invalid
+      // values and if the dynamic linker is not available, why are we even
+      // emitting relocations but in the case we are compiling the dynamic
+      // linker, we at least want the _start method to get called so it can
+      // relocate itself and that won't work if the opd section is not relocated
+      sec->addReloc({expr, type, offset, addend, &sym});
+
       addRelativeReloc<true>(ctx, *sec, offset, sym, addend, expr, type);
       return;
     }
@@ -1184,6 +1201,7 @@ void RelocationScanner::processAux(RelExpr expr, RelType type, uint64_t offset,
         }
         return;
       }
+
       part.relaDyn->addSymbolReloc(rel, *sec, offset, sym, addend, type);
 
       // MIPS ABI turns using of GOT and dynamic relocations inside out.

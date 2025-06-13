@@ -926,7 +926,9 @@ Error RuntimeDyldELF::findOPDEntrySection(const ELFObjectFileBase &Obj,
       // The R_PPC64_ADDR64 relocation indicates the first field
       // of a .opd entry
       uint64_t TypeFunc = i->getType();
-      uint64_t ExpectedRelocation = Obj.getOS() == Triple::OSType::Lv2 ? ELF::R_PPC64_ADDR32 : ELF::R_PPC64_ADDR64;
+      uint64_t ExpectedRelocation = Obj.getOS() == Triple::OSType::Lv2
+                                        ? ELF::R_PPC64_ADDR32
+                                        : ELF::R_PPC64_ADDR64;
       if (TypeFunc != ExpectedRelocation) {
         ++i;
         continue;
@@ -1959,7 +1961,10 @@ Expected<relocation_iterator> RuntimeDyldELF::processRelocationRef(
               Section.getAddressWithOffset(Section.getStubOffset()),
               AbiVariant);
           RelocationEntry RE(SectionID, StubTargetAddr - Section.getAddress(),
-                             O.getOS() == Triple::OSType::Lv2 ? ELF::R_PPC64_ADDR32 : ELF::R_PPC64_ADDR64, Value.Addend);
+                             O.getOS() == Triple::OSType::Lv2
+                                 ? ELF::R_PPC64_ADDR32
+                                 : ELF::R_PPC64_ADDR64,
+                             Value.Addend);
 
           // Generates the 64-bits address loads as exemplified in section
           // 4.5.1 in PPC64 ELF ABI.  Note that the relocations need to

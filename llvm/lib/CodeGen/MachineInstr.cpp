@@ -291,11 +291,6 @@ void MachineInstr::addOperand(MachineFunction &MF, const MachineOperand &Op) {
     if (NewMO->isUse() && isDebugInstr())
       NewMO->setIsDebug();
   }
-
-  if (getOpcode() == TargetOpcode::COPY) {
-    outs() << "found copy: ";
-    dumpr(MF.getRegInfo());
-  }
 }
 
 void MachineInstr::removeOperand(unsigned OpNo) {

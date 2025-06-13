@@ -61,49 +61,49 @@ using namespace llvm;
 /// register name so that only the number is left.  Used by for linux asm.
 const char *PPC::stripRegisterPrefix(const char *RegName) {
   switch (RegName[0]) {
-    case 'a':
-      if (RegName[1] == 'c' && RegName[2] == 'c')
+  case 'a':
+    if (RegName[1] == 'c' && RegName[2] == 'c')
+      return RegName + 3;
+    break;
+  case 'f':
+    if (RegName[1] == 'p')
+      return RegName + 2;
+    [[fallthrough]];
+  case 'r':
+  case 'v':
+    if (RegName[1] == 's') {
+      if (RegName[2] == 'p')
         return RegName + 3;
-      break;
-    case 'f':
-      if (RegName[1] == 'p')
-        return RegName + 2;
-      [[fallthrough]];
-    case 'r':
-    case 'v':
-      if (RegName[1] == 's') {
-        if (RegName[2] == 'p')
-          return RegName + 3;
-        return RegName + 2;
-      }
-      return RegName + 1;
-    case 'c':
-      if (RegName[1] == 'r')
-        return RegName + 2;
-      break;
-    case 'w':
-      // For wacc and wacc_hi
-      if (RegName[1] == 'a' && RegName[2] == 'c' && RegName[3] == 'c') {
-        if (RegName[4] == '_')
-          return RegName + 7;
-        else
-          return RegName + 4;
-      }
-      break;
-    case 'd':
-      // For dmr, dmrp, dmrrow, dmrrowp
-      if (RegName[1] == 'm' && RegName[2] == 'r') {
-        if (RegName[3] == 'r' && RegName[4] == 'o' && RegName[5] == 'w' &&
-            RegName[6] == 'p')
-          return RegName + 7;
-        else if (RegName[3] == 'r' && RegName[4] == 'o' && RegName[5] == 'w')
-          return RegName + 6;
-        else if (RegName[3] == 'p')
-          return RegName + 4;
-        else
-          return RegName + 3;
-      }
-      break;
+      return RegName + 2;
+    }
+    return RegName + 1;
+  case 'c':
+    if (RegName[1] == 'r')
+      return RegName + 2;
+    break;
+  case 'w':
+    // For wacc and wacc_hi
+    if (RegName[1] == 'a' && RegName[2] == 'c' && RegName[3] == 'c') {
+      if (RegName[4] == '_')
+        return RegName + 7;
+      else
+        return RegName + 4;
+    }
+    break;
+  case 'd':
+    // For dmr, dmrp, dmrrow, dmrrowp
+    if (RegName[1] == 'm' && RegName[2] == 'r') {
+      if (RegName[3] == 'r' && RegName[4] == 'o' && RegName[5] == 'w' &&
+          RegName[6] == 'p')
+        return RegName + 7;
+      else if (RegName[3] == 'r' && RegName[4] == 'o' && RegName[5] == 'w')
+        return RegName + 6;
+      else if (RegName[3] == 'p')
+        return RegName + 4;
+      else
+        return RegName + 3;
+    }
+    break;
   }
 
   return RegName;
@@ -121,22 +121,22 @@ unsigned PPC::getRegNumForOperand(const MCInstrDesc &Desc, unsigned Reg,
                                   unsigned OpNo) {
   int16_t regClass = Desc.operands()[OpNo].RegClass;
   switch (regClass) {
-    // We store F0-F31, VF0-VF31 in MCOperand and it should be F0-F31,
-    // VSX32-VSX63 during encoding/disassembling
-    case PPC::VSSRCRegClassID:
-    case PPC::VSFRCRegClassID:
-      if (PPC::isVFRegister(Reg))
-	return PPC::VSX32 + (Reg - PPC::VF0);
-      break;
-    // We store VSL0-VSL31, V0-V31 in MCOperand and it should be VSL0-VSL31,
-    // VSX32-VSX63 during encoding/disassembling
-    case PPC::VSRCRegClassID:
-      if (PPC::isVRRegister(Reg))
-	return PPC::VSX32 + (Reg - PPC::V0);
-      break;
-    // Other RegClass doesn't need mapping
-    default:
-      break;
+  // We store F0-F31, VF0-VF31 in MCOperand and it should be F0-F31,
+  // VSX32-VSX63 during encoding/disassembling
+  case PPC::VSSRCRegClassID:
+  case PPC::VSFRCRegClassID:
+    if (PPC::isVFRegister(Reg))
+      return PPC::VSX32 + (Reg - PPC::VF0);
+    break;
+  // We store VSL0-VSL31, V0-V31 in MCOperand and it should be VSL0-VSL31,
+  // VSX32-VSX63 during encoding/disassembling
+  case PPC::VSRCRegClassID:
+    if (PPC::isVRRegister(Reg))
+      return PPC::VSX32 + (Reg - PPC::V0);
+    break;
+  // Other RegClass doesn't need mapping
+  default:
+    break;
   }
   return Reg;
 }
@@ -283,7 +283,14 @@ public:
 
 class PPCTargetELFStreamer : public PPCTargetStreamer {
 public:
-  PPCTargetELFStreamer(MCStreamer &S) : PPCTargetStreamer(S) {}
+  PPCTargetELFStreamer(MCStreamer &S, int AbiVersion) : PPCTargetStreamer(S) {
+    // todo(localcc): can't call virtual functions in constructor :(
+    ELFObjectWriter &W = getStreamer().getWriter();
+    unsigned Flags = W.getELFHeaderEFlags();
+    Flags &= ~ELF::EF_PPC64_ABI;
+    Flags |= (AbiVersion & ELF::EF_PPC64_ABI);
+    W.setELFHeaderEFlags(Flags);
+  }
 
   MCELFStreamer &getStreamer() {
     return static_cast<MCELFStreamer &>(Streamer);
@@ -456,7 +463,8 @@ static MCTargetStreamer *
 createObjectTargetStreamer(MCStreamer &S, const MCSubtargetInfo &STI) {
   const Triple &TT = STI.getTargetTriple();
   if (TT.isOSBinFormatELF())
-    return new PPCTargetELFStreamer(S);
+    return new PPCTargetELFStreamer(
+        S, STI.getTargetTriple().isPPC64ELFv2ABI() ? 2 : 1);
   if (TT.isOSBinFormatXCOFF())
     return new PPCTargetXCOFFStreamer(S);
   return new PPCTargetMachOStreamer(S);

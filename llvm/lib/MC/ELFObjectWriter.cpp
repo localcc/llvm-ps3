@@ -1330,6 +1330,15 @@ bool ELFObjectWriter::shouldRelocateWithSymbol(const MCAssembler &Asm,
   // produce the wrong value.
   if (Sym->isInSection()) {
     auto &Sec = cast<MCSectionELF>(Sym->getSection());
+
+    // todo(localcc): this might be better fixed in lld
+    // however i am not sure how because opd thunks are generated for a symbol
+    // it would have to synthesize the opd section instead of using the
+    // glued together one or do something else but idk what
+    if (Sec.getName() == ".opd") {
+      return true;
+    }
+
     unsigned Flags = Sec.getFlags();
     if (Flags & ELF::SHF_MERGE) {
       if (C != 0)
