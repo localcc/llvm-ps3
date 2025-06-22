@@ -483,7 +483,7 @@ public:
 class PPC64PltOpdCallStub final : public Thunk {
 public:
   PPC64PltOpdCallStub(Ctx &ctx, Symbol &dest) : Thunk(ctx, dest, 0) {}
-  uint32_t size() override { return 24; }
+  uint32_t size() override { return 28; }
   void writeTo(uint8_t *buf) override;
   void addSymbols(ThunkSection &isec) override;
   bool isCompatibleWith(const InputSection &isec,
@@ -1425,15 +1425,16 @@ void PPC64PltOpdCallStub::writeTo(uint8_t *buf) {
   uint16_t offHa = (offset + 0x8000) >> 16;
   uint16_t offLo = offset & 0xffff;
 
-  write32(ctx, buf + 0, 0x3d820000 | offHa); // addis r12, r2, OffHa
-  write32(ctx, buf + 4, 0xe98c0000 | offLo); // ld    r12, OffLo(r12)
-  write32(ctx, buf + 8, 0xe98c0000);         // ld r12, 0(r12)
-  write32(ctx, buf + 12, 0x7d8903a6);        // mtctr r12
-  write32(ctx, buf + 16, 0x4e800420);        // bctr
+  write32(ctx, buf + 4, 0x3d820000 | offHa); // addis r12, r2, OffHa
+  write32(ctx, buf + 8, 0xe98c0000 | offLo); // ld    r12, OffLo(r12)
+  write32(ctx, buf + 12, 0xe84c0008);        // ld r2, 8(r12)
+  write32(ctx, buf + 16, 0xe98c0000);        // ld r12, 0(r12)
+  write32(ctx, buf + 20, 0x7d8903a6);        // mtctr r12
+  write32(ctx, buf + 24, 0x4e800420);        // bctr
 }
 
 void PPC64PltOpdCallStub::addSymbols(lld::elf::ThunkSection &isec) {
-  Defined *s = addSymbol(ctx.saver.save("__plt_" + destination.getName()),
+  Defined *s = addSymbol(ctx.saver.save("__pltop_" + destination.getName()),
                          STT_FUNC, 0, isec);
   s->setNeedsTocRestore(true);
   s->file = destination.file;

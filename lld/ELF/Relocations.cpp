@@ -1019,8 +1019,10 @@ bool RelocationScanner::isStaticLinkTimeConstant(RelExpr e, RelType type,
 
   // todo(localcc): add elfv1 abi check
   // global non preemptible symbols are link time constants in elfv1
-  if (ctx.arg.emachine == EM_PPC64 && !sym.isPreemptible && sym.isGlobal())
-    return true;
+  //  if (ctx.arg.emachine == EM_PPC64 && !sym.isPreemptible && sym.isGlobal()
+  //  &&
+  //      !sym.isTls() && !sym.isFunc())
+  //    return true;
 
   // For the target and the relocation, we want to know if they are
   // absolute or relative.
