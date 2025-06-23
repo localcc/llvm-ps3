@@ -1924,7 +1924,7 @@ void PPCLinuxAsmPrinter::emitStartOfAsmFile(Module &M) {
   if (static_cast<const PPCTargetMachine &>(TM).isELFv2ABI()) {
     TS->emitAbiVersion(2);
   } else {
-    TS->emitAbiVersion(1);
+    TS->emitAbiVersion(0);
   }
 
   if (static_cast<const PPCTargetMachine &>(TM).isPPC64() ||

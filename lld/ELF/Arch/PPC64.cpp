@@ -609,24 +609,30 @@ PPC64::PPC64(Ctx &ctx) : TargetInfo(ctx) {
   gotPltHeaderEntriesNum = 2;
   needsThunks = true;
 
-  uint32_t prevFlag = -1;
+  int elfVersion = -1;
   for (InputFile *f : ctx.objectFiles) {
-    uint32_t flag = getEFlags(f);
-    if (prevFlag == -1)
-      prevFlag = flag;
+    int prevVersion = elfVersion;
 
-    if (flag != prevFlag) {
+    uint32_t flag = getEFlags(f);
+    if (flag == 2)
+      elfVersion = 2;
+    else if (flag == 0 || flag == 1)
+      elfVersion = 1;
+
+    if (prevVersion == -1)
+      prevVersion = elfVersion;
+
+    if (prevVersion != elfVersion) {
       ErrAlways(ctx) << "ELFv1/ELFv2 object file abi mismatch for "
                      << f->getName();
     }
-    prevFlag = flag;
   }
 
-  if (prevFlag != 1 && ctx.arg.prx) {
+  if (elfVersion != 1 && ctx.arg.prx) {
     ErrAlways(ctx) << "PRX can only link from ELFv1";
   }
 
-  if (prevFlag == 1 || ctx.arg.prx) {
+  if (elfVersion == 1 || ctx.arg.prx) {
     abiKind = ELFAbiKind::ELFv1;
   } else {
     abiKind = ELFAbiKind::ELFv2;
