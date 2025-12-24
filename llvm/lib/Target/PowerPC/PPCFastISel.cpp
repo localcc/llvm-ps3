@@ -2135,7 +2135,14 @@ unsigned PPCFastISel::PPCMaterializeGV(const GlobalValue *GV, MVT VT) {
 
   // (localcc): changes
   assert(VT == TLI.getPointerTy(DL) && "Non-address!");
-  const TargetRegisterClass *RC = &PPC::G8RC_and_G8RC_NOX0RegClass;
+  const TargetRegisterClass *RC;
+  if (VT == MVT::i64)
+    RC = &PPC::G8RC_and_G8RC_NOX0RegClass;
+  else if (VT == MVT::i32)
+    RC = &PPC::GPRC_and_GPRC_NOR0RegClass;
+  else
+    assert(false && "unknown VT for pointer");
+
   Register DestReg = createResultReg(RC);
 
   // Global values may be plain old object addresses, TLS object
